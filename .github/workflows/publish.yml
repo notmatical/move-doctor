@@ -39,10 +39,6 @@ jobs:
       - name: Install
         run: bun install --frozen-lockfile
 
-      # Opens/updates a "Version Packages" PR while changesets are pending, and
-      # publishes to npm once that PR is merged. `release` runs the full build
-      # before `changeset publish` so dist/ is fresh. Auth is tokenless via OIDC
-      # — requires a Trusted Publisher configured for `move-doctor` on npmjs.com.
       - name: Create release PR or publish
         uses: changesets/action@v1
         with:
