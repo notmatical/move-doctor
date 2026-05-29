@@ -26,14 +26,17 @@ jobs:
       - name: Lint + format (Biome via Ultracite)
         run: bun run check
 
+      # Build first: typecheck (`tsc --noEmit`) and the regression test resolve
+      # `core`/`rules` from their built `dist/` and run the bundled CLI, so the
+      # libraries + CLI must exist before those steps.
+      - name: Build (all packages)
+        run: bun run build
+
       - name: Typecheck
         run: bun run typecheck
 
       - name: Test
         run: bun run test
-
-      - name: Build (all packages)
-        run: bun run build
 
       - name: Pack tarball (CLI publish dry-run)
         run: bun run publish:dry
