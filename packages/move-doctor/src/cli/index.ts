@@ -34,7 +34,7 @@ import { hasDisabledSetupPrompt } from "./utils/persistent-config.js";
 import { resolveScope } from "./utils/scope-prompt.js";
 import { startSpinner } from "./utils/spinner.js";
 
-const HELP_TEXT = `move-doctor — Your agent writes bad Move, this catches it.
+const HELP_TEXT = `Move Doctor — A deterministic linter for Sui Move.
 
 Usage:
   move-doctor [directory] [flags]

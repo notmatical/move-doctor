@@ -1,14 +1,17 @@
 {
   "name": "move-doctor",
   "version": "0.1.0",
-  "description": "Your agent writes bad Move, this catches it. Deterministic Sui Move scanner with a 0-100 health score and a SKILL.md for coding agents.",
+  "description": "A deterministic linter for Sui Move. Rules cited via the Move Book, with a SKILL.md for coding agents.",
   "keywords": [
     "sui",
     "move",
+    "sui-move",
     "linter",
+    "lint",
+    "static-analysis",
+    "code-quality",
+    "cli",
     "agent",
-    "code-review",
-    "audit",
     "skill"
   ],
   "license": "MIT",
