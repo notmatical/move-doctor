@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Build & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.8
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Lint + format (Biome via Ultracite)
+        run: bun run check
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test
+        run: bun run test
+
+      - name: Build (all packages)
+        run: bun run build
+
+      - name: Pack tarball (CLI publish dry-run)
+        run: bun run publish:dry
+
+  smoke:
+    name: CLI smoke test
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.8
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Build CLI
+        run: bun run --filter='move-doctor' build
+
+      - name: Scan a known-bad fixture
+        run: |
+          SCORE=$(node packages/move-doctor/dist/cli.js fixtures/movebook-gaps --score)
+          echo "movebook-gaps score: $SCORE"
+          # The gap fixture deliberately triggers many rules. It must not score
+          # higher than 60 (sanity check that rules are actually firing).
+          if [ "$SCORE" -gt 60 ]; then
+            echo "::error::Expected score <= 60 on movebook-gaps fixture, got $SCORE"
+            exit 1
+          fi
+
+      - name: Scan the clean hello fixture
+        run: |
+          SCORE=$(node packages/move-doctor/dist/cli.js fixtures/hello-move --score)
+          echo "hello-move score: $SCORE"
+          # The clean fixture must score 100 — any drop here is a regression.
+          if [ "$SCORE" -lt 100 ]; then
+            echo "::error::Expected score 100 on hello-move fixture, got $SCORE"
+            exit 1
+          fi

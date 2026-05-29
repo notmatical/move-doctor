@@ -1,0 +1,48 @@
+{
+  "devDependencies": {
+    "@biomejs/biome": "2.4.15",
+    "@changesets/changelog-github": "^0.7.0",
+    "@changesets/cli": "^2.31.0",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.3",
+    "ultracite": "7.7.0"
+  },
+  "name": "move-doctor-monorepo",
+  "scripts": {
+    "build": "bun run build:libs && bun run build:apps",
+    "build:libs": "bun run --filter='core' --filter='rules' build",
+    "build:apps": "bun run --filter='move-doctor' --filter='@move-doctor/website' build",
+    "typecheck": "bun run --filter='./packages/*' typecheck",
+    "test": "bun run test:unit && bun run test:regression",
+    "test:unit": "bun test packages",
+    "test:regression": "bun test tests/regression",
+    "test:corpus": "MOVE_DOCTOR_CORPUS=1 bun test tests/corpus",
+    "gen": "bun run --filter='rules' gen",
+    "grammar:build": "bun scripts/build-move-grammar.ts",
+    "clean": "bun run --filter='./packages/*' clean",
+    "cli": "node packages/move-doctor/dist/cli.js",
+    "cli:dev": "bun run --filter='move-doctor' build && node packages/move-doctor/dist/cli.js",
+    "site": "bun run --filter='@move-doctor/website' dev",
+    "site:build": "bun run --filter='@move-doctor/website' build",
+    "smoke": "node packages/move-doctor/dist/cli.js fixtures/movebook-gaps --verbose",
+    "pack": "bun run --filter='move-doctor' build && cd packages/move-doctor && npm pack",
+    "publish:dry": "bun run --filter='move-doctor' build && cd packages/move-doctor && npm publish --dry-run",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "bun run build && changeset publish",
+    "check": "ultracite check",
+    "fix": "ultracite fix"
+  },
+  "type": "module",
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/*"
+  ],
+  "private": true,
+  "description": "Your agent writes bad Move, this catches it.",
+  "license": "MIT",
+  "packageManager": "bun@1.3.8",
+  "engines": {
+    "node": ">=20"
+  }
+}

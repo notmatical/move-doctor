@@ -1,0 +1,6 @@
+[package]
+name = "phase4_bad"
+edition = "2024.beta"
+
+[addresses]
+phase4_bad = "0x0"

@@ -1,0 +1,6 @@
+[package]
+name = "lint_trigger"
+edition = "2024.beta"
+
+[addresses]
+lint_trigger = "0x0"

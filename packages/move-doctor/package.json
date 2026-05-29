@@ -1,0 +1,60 @@
+{
+  "name": "move-doctor",
+  "version": "0.1.0",
+  "description": "Your agent writes bad Move, this catches it. Deterministic Sui Move scanner with a 0-100 health score and a SKILL.md for coding agents.",
+  "keywords": [
+    "sui",
+    "move",
+    "linter",
+    "agent",
+    "code-review",
+    "audit",
+    "skill"
+  ],
+  "license": "MIT",
+  "homepage": "https://move.doctor",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/notmatical/move-doctor.git",
+    "directory": "packages/move-doctor"
+  },
+  "bugs": {
+    "url": "https://github.com/notmatical/move-doctor/issues"
+  },
+  "type": "module",
+  "bin": {
+    "move-doctor": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "prebuild": "bun scripts/embed-skill.ts",
+    "build": "tsup",
+    "build:watch": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "clean": "rm -rf dist *.tsbuildinfo src/cli/skill-content.ts"
+  },
+  "dependencies": {
+    "agent-install": "^0.0.5",
+    "picocolors": "^1.1.1",
+    "prompts": "^2.4.2",
+    "web-tree-sitter": "0.26.9"
+  },
+  "devDependencies": {
+    "core": "workspace:*",
+    "rules": "workspace:*",
+    "@types/prompts": "^2.4.9",
+    "tsup": "^8.3.5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

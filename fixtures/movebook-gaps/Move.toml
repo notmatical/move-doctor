@@ -1,0 +1,6 @@
+[package]
+name = "movebook_gaps"
+edition = "2024.beta"
+
+[addresses]
+movebook_gaps = "0x0"
