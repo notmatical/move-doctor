@@ -1,6 +1,6 @@
 # Move Doctor
 
-> Your agent writes bad Move, this catches it.
+> A deterministic linter for Sui Move.
 
 Deterministic Sui Move scanner. Rules grounded in [The Move Book](https://move-book.com/guides/code-quality-checklist/), the Sui compiler's `--lint` pass, and documented Sui Move best practices. Outputs a 0–100 health score with file/line refs and fix recipes.
 
@@ -10,19 +10,27 @@ Deterministic Sui Move scanner. Rules grounded in [The Move Book](https://move-b
 npx move-doctor@latest
 ```
 
-Scans the current directory. Sample output:
+Scans the current directory and prints a health score, a per-bucket breakdown, and next steps. Add `--verbose` for file/line refs and fix hints. Sample output:
 
 ```
-move-doctor: my_package (edition: 2024.beta)
+  ╭────────────────────────────────────────────────────────────────────────╮
+  │                                                                        │
+  │ 44 / 100   poor                                          movebook_gaps │
+  │ ███████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+  │                                                                        │
+  │ 2 modules · edition 2024.beta · Sui 1.70.2 · scanned in 1.3s           │
+  │ 22 findings  >  4 errors · 3 warnings · 15 info                        │
+  ╰────────────────────────────────────────────────────────── move.doctor ─╯
 
-Score: 84 / 100
-Findings: 8 (errors: 0, warnings: 1, info: 7)
+  security     >  4 errors · 3 warnings
+  conventions  >  5 info
+  testing      >  5 info
+  functions    >  2 info
+  idioms       >  2 info
+  macros       >  1 info
 
-INFO  conventions/event-not-past-tense  (Move Book §11)
-         sources/registry.move:42:5
-         Event type "RegisterUser" looks present-tense …
-         fix: Rename to a past-tense form (e.g. "UserRegistered").
-…
+  > Run --verbose for file refs and fix hints.
+  > Full rule catalog: https://move.doctor/docs/rules
 ```
 
 ## Install as an agent skill
@@ -41,47 +49,6 @@ Use `--score` for a numeric output and gate PRs on a budget:
 SCORE=$(npx move-doctor@latest . --score)
 [ "$SCORE" -ge 80 ] || exit 1
 ```
-
-## Flags
-
-| Flag              | Purpose                                                  |
-| ----------------- | -------------------------------------------------------- |
-| `<directory>`     | Path to scan (default: `.`)                              |
-| `--verbose`       | Show file/line refs and fix hints per finding            |
-| `--diff[=base]`   | Only scan files changed vs `HEAD` (or vs `<base>`)       |
-| `--score`         | Output only the numeric score (CI gate)                  |
-| `--json`          | Emit machine-readable output                             |
-| `--no-tests`      | Skip `*_tests.move` and `tests/`                         |
-| `install`         | Install the SKILL.md into the current directory's agents |
-| `-h`, `--help`    | Show CLI help                                            |
-| `-v`, `--version` | Show version                                             |
-
-## What it catches
-
-Covers every applicable section of [The Move Book Code Quality Checklist](https://move-book.com/guides/code-quality-checklist/) (§1–§40), plus targeted ability and security best-practice rules.
-
-| Bucket | Covers |
-|--|--|
-| `conventions` | Move Book §1–§12, §32, §40 + error-code / dead-const hygiene |
-| `functions` | Move Book §13–§17 + recursion check |
-| `idioms` | Move Book §18–§25 |
-| `macros` | Move Book §26–§31 |
-| `testing` | Move Book §33–§39 |
-| `abilities` | Sui Move ability safety |
-| `security` | Sui Move security best practice |
-| `(compiler)` | Sui `--lint` pass-through (W00001 / W01001 / W02001 / W03001 / W04001 / W05001) — when `sui` is on PATH |
-
-Full catalog with per-rule playbooks: [move.doctor/docs/rules](https://move.doctor/docs/rules)
-
-## Score model
-
-Start at 100. Each finding deducts a per-severity weight:
-
-- `error` &nbsp; -8
-- `warning` -3
-- `info` &nbsp; &nbsp; &nbsp; -1
-
-Capped at -25 per rule so a single noisy rule can't tank the score. Floor at 0.
 
 ## Requirements
 

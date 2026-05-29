@@ -3,7 +3,7 @@
 [![version](https://img.shields.io/npm/v/move-doctor?style=flat&colorA=000000&colorB=000000)](https://npmjs.com/package/move-doctor)
 [![downloads](https://img.shields.io/npm/dt/move-doctor.svg?style=flat&colorA=000000&colorB=000000)](https://npmjs.com/package/move-doctor)
 
-**Your agent writes bad Move, this catches it.**
+**A deterministic linter for Sui Move.**
 
 Move Doctor scans a Sui Move codebase and reports issues across conventions, idioms, abilities, testing, and security — with a 0–100 health score. It's deterministic and runs anywhere `npx` does. Every rule cites its source: [The Move Book](https://move-book.com/guides/code-quality-checklist/) code-quality checklist, the Sui compiler's `--lint` pass, and Sui Move security best practices. Structural rules run on [MystenLabs' tree-sitter Move grammar](https://github.com/MystenLabs/sui/tree/main/external-crates/move/tooling/tree-sitter); the rest are fast text checks.
 

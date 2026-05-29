@@ -39,7 +39,7 @@
     "packages/*"
   ],
   "private": true,
-  "description": "Your agent writes bad Move, this catches it.",
+  "description": "A deterministic linter for Sui Move.",
   "license": "MIT",
   "packageManager": "bun@1.3.8",
   "engines": {
