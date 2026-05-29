@@ -45,11 +45,16 @@ describe("regression: hello-move (clean fixture)", () => {
 describe("regression: movebook-gaps (idiom-heavy fixture)", () => {
   const result = scan("movebook-gaps");
 
-  it("scores in the expected band (locked)", () => {
-    // Locked range — a rule change that moves this flags a behavior shift to
-    // review, not silently accept.
-    expect(result.score.score).toBeGreaterThanOrEqual(40);
-    expect(result.score.score).toBeLessThanOrEqual(50);
+  it("trips the expected number of move-doctor rules (locked)", () => {
+    // Lock move-doctor's OWN findings, excluding the `compiler/*` Sui-lint
+    // pass-through — that depends on whether the `sui` CLI is installed, so it
+    // differs between local and CI and must not enter the regression baseline.
+    // A shift here flags a behavior change to review, not silently accept.
+    const ownFindings = result.diagnostics.filter(
+      (d) => !d.ruleId.startsWith("compiler/")
+    );
+    expect(ownFindings.length).toBeGreaterThanOrEqual(12);
+    expect(ownFindings.length).toBeLessThanOrEqual(20);
   });
 
   it("surfaces the Move 2024 idiom rules it is designed to trip", () => {
