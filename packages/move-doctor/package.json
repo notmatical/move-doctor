@@ -15,7 +15,7 @@
   "homepage": "https://move.doctor",
   "repository": {
     "type": "git",
-    "url": "https://github.com/notmatical/move-doctor.git",
+    "url": "git+https://github.com/notmatical/move-doctor.git",
     "directory": "packages/move-doctor"
   },
   "bugs": {
@@ -23,7 +23,7 @@
   },
   "type": "module",
   "bin": {
-    "move-doctor": "./dist/cli.js"
+    "move-doctor": "dist/cli.js"
   },
   "files": [
     "dist",
