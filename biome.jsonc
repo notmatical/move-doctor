@@ -9,6 +9,7 @@
       "!packages/move-doctor/src/cli/skill-content.ts",
       "!packages/rules/src/rule-registry.ts",
       "!fixtures",
+      "!scripts/*.mjs",
       "!**/*.md"
     ]
   },

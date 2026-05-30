@@ -1,0 +1,231 @@
+name: "Move Doctor"
+description: "A deterministic linter for Sui Move. Catches the convention, idiom, ability, and security mistakes the compiler misses — scored 0-100, every rule cited."
+branding:
+  icon: "crosshair"
+  color: "blue"
+
+inputs:
+  directory:
+    description: "Project directory to scan."
+    default: "."
+  package:
+    description: "Workspace package(s) to scan, by name or relative path (comma-separated)."
+    required: false
+  fail-on:
+    description: "Exit non-zero when diagnostics fire (error, warning, none)."
+    default: "error"
+  diff:
+    description: "Only scan files changed vs git. Use 'true' for HEAD, or pass a base ref/SHA. Empty scans everything."
+    required: false
+    default: ""
+  no-tests:
+    description: "Skip test files (*_tests.move and tests/)."
+    default: "false"
+  comment:
+    description: "Create or update a sticky pull request summary comment."
+    default: "true"
+  annotations:
+    description: "Emit diagnostics as GitHub Actions annotations."
+    default: "true"
+  sui-version:
+    description: "Install the Sui CLI to enable compiler lints (W0*). Use 'latest' for the newest mainnet release, pin a tag like 'mainnet-v1.68.1', or leave empty to skip."
+    required: false
+    default: ""
+  node-version:
+    description: "Node.js version to use."
+    default: "22"
+  version:
+    description: "move-doctor npm version or package spec to run (or a local path)."
+    default: "latest"
+
+outputs:
+  score:
+    description: "Health score (0-100). Empty when scoring was unavailable."
+    value: ${{ steps.render.outputs.score }}
+  total-issues:
+    description: "Total diagnostic count in the scan report."
+    value: ${{ steps.render.outputs.total-issues }}
+  error-count:
+    description: "Error diagnostic count in the scan report."
+    value: ${{ steps.render.outputs.error-count }}
+  warning-count:
+    description: "Warning diagnostic count in the scan report."
+    value: ${{ steps.render.outputs.warning-count }}
+  info-count:
+    description: "Info diagnostic count in the scan report."
+    value: ${{ steps.render.outputs.info-count }}
+  affected-files:
+    description: "Number of files with diagnostics."
+    value: ${{ steps.render.outputs.affected-files }}
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-node@v5
+      with:
+        node-version: ${{ inputs.node-version }}
+        package-manager-cache: false
+
+    - name: Install Sui CLI
+      if: ${{ inputs.sui-version != '' }}
+      shell: bash
+      env:
+        SUI_VERSION_INPUT: ${{ inputs.sui-version }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        FALLBACK="mainnet-v1.68.1"
+
+        # Resolve the release tag (newest mainnet-v* when "latest").
+        if [ "$SUI_VERSION_INPUT" = "latest" ]; then
+          AUTH=()
+          if [ -n "${GH_TOKEN:-}" ]; then AUTH=(-H "Authorization: Bearer $GH_TOKEN"); fi
+          VERSION=$(curl -sf "${AUTH[@]}" https://api.github.com/repos/MystenLabs/sui/releases \
+            | jq -r '[.[] | select(.tag_name | startswith("mainnet-v"))][0].tag_name // empty' || true)
+          if [ -z "$VERSION" ]; then
+            echo "::warning::Could not resolve the latest Sui mainnet release; falling back to $FALLBACK."
+            VERSION="$FALLBACK"
+          fi
+        else
+          VERSION="$SUI_VERSION_INPUT"
+        fi
+
+        # Map runner OS/arch to the release asset suffix.
+        case "${RUNNER_OS:-Linux}" in
+          Linux)
+            case "$(uname -m)" in
+              x86_64) ASSET="ubuntu-x86_64" ;;
+              aarch64|arm64) ASSET="ubuntu-aarch64" ;;
+              *) echo "::warning::Unsupported Linux arch $(uname -m); skipping Sui install (compiler lints will be skipped)."; exit 0 ;;
+            esac ;;
+          macOS)
+            case "$(uname -m)" in
+              arm64) ASSET="macos-arm64" ;;
+              x86_64) ASSET="macos-x86_64" ;;
+              *) echo "::warning::Unsupported macOS arch $(uname -m); skipping Sui install."; exit 0 ;;
+            esac ;;
+          Windows) ASSET="windows-x86_64" ;;
+          *) echo "::warning::Unsupported runner OS ${RUNNER_OS}; skipping Sui install."; exit 0 ;;
+        esac
+
+        DEST="${RUNNER_TEMP:-/tmp}/sui-cli"
+        mkdir -p "$DEST"
+        URL="https://github.com/MystenLabs/sui/releases/download/${VERSION}/sui-${VERSION}-${ASSET}.tgz"
+        echo "Installing Sui $VERSION ($ASSET)"
+        if ! curl -fsSL "$URL" | tar -xz -C "$DEST"; then
+          echo "::warning::Failed to download or extract Sui $VERSION from $URL; compiler lints (W0*) will be skipped."
+          exit 0
+        fi
+        echo "$DEST" >> "$GITHUB_PATH"
+        "$DEST/sui" --version || echo "::warning::Sui extracted but 'sui --version' failed."
+
+    - id: scan
+      shell: bash
+      env:
+        NO_COLOR: "1"
+        INPUT_DIRECTORY: ${{ inputs.directory }}
+        INPUT_PACKAGE: ${{ inputs.package }}
+        INPUT_DIFF: ${{ inputs.diff }}
+        INPUT_NO_TESTS: ${{ inputs.no-tests }}
+        INPUT_VERSION: ${{ inputs.version }}
+        RUNNER_TEMP: ${{ runner.temp }}
+        GITHUB_RUN_ID: ${{ github.run_id }}
+      run: |
+        REPORT_FILE="${RUNNER_TEMP:-/tmp}/move-doctor-report-${GITHUB_RUN_ID:-$$}.json"
+        echo "report-file=$REPORT_FILE" >> "$GITHUB_OUTPUT"
+
+        FLAGS=("--json" "--no-banner")
+        if [ "$INPUT_NO_TESTS" = "true" ]; then FLAGS+=("--no-tests"); fi
+        if [ -n "$INPUT_PACKAGE" ]; then FLAGS+=("--package=$INPUT_PACKAGE"); fi
+        case "$INPUT_DIFF" in
+          ""|"false") ;;
+          "true") FLAGS+=("--diff") ;;
+          *) FLAGS+=("--diff=$INPUT_DIFF") ;;
+        esac
+
+        case "$INPUT_VERSION" in
+          ./*|../*|/*) PACKAGE_SPEC="$INPUT_VERSION" ;;
+          *) PACKAGE_SPEC="move-doctor@$INPUT_VERSION" ;;
+        esac
+
+        set +e
+        npm exec --yes --package "$PACKAGE_SPEC" -- move-doctor "$INPUT_DIRECTORY" "${FLAGS[@]}" > "$REPORT_FILE" 2> "$REPORT_FILE.err"
+        SCAN_STATUS=$?
+        set -e
+
+        if [ -s "$REPORT_FILE.err" ]; then
+          echo "::group::move-doctor stderr"
+          cat "$REPORT_FILE.err"
+          echo "::endgroup::"
+        fi
+
+        # Normalize move-doctor's output into the canonical report shape (or write
+        # a fallback report); bump the status when the scan produced no report.
+        if ! node "$GITHUB_ACTION_PATH/scripts/ensure-json-report.mjs" "$REPORT_FILE" "$SCAN_STATUS"; then
+          SCAN_STATUS=1
+        fi
+        echo "exit-code=$SCAN_STATUS" >> "$GITHUB_OUTPUT"
+
+    - id: render
+      if: always()
+      shell: bash
+      env:
+        REPORT_FILE: ${{ steps.scan.outputs.report-file }}
+        COMMENT_FILE: ${{ runner.temp }}/move-doctor-comment.md
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_ANNOTATIONS: ${{ inputs.annotations }}
+        INPUT_DIFF: ${{ inputs.diff }}
+        GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        echo "comment-file=$COMMENT_FILE" >> "$GITHUB_OUTPUT"
+        node "$GITHUB_ACTION_PATH/scripts/render-github-action-comment.mjs" "$REPORT_FILE" "$COMMENT_FILE"
+
+    - name: Update sticky PR comment
+      if: ${{ always() && github.event_name == 'pull_request' && inputs.comment == 'true' }}
+      uses: actions/github-script@v8
+      env:
+        MOVE_DOCTOR_COMMENT_FILE: ${{ steps.render.outputs.comment-file }}
+      with:
+        script: |
+          const fs = require("fs");
+          const commentPath = process.env.MOVE_DOCTOR_COMMENT_FILE;
+          if (!commentPath || !fs.existsSync(commentPath)) return;
+
+          const body = fs.readFileSync(commentPath, "utf8").trim();
+          if (!body) return;
+
+          const marker = "<!-- move-doctor:summary -->";
+          try {
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const previous = comments.find((comment) => comment.body?.startsWith(marker));
+            if (previous) {
+              await github.rest.issues.updateComment({
+                ...context.repo,
+                comment_id: previous.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+          } catch (error) {
+            core.warning(`Move Doctor could not update the sticky PR comment: ${error.message}`);
+          }
+
+    - name: Fail if Move Doctor found blocking issues
+      if: always()
+      shell: bash
+      env:
+        SHOULD_FAIL: ${{ steps.render.outputs.should-fail }}
+      run: |
+        if [ "$SHOULD_FAIL" = "true" ]; then
+          exit 1
+        fi
+        exit 0
