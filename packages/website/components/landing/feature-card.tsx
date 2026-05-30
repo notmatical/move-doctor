@@ -13,7 +13,7 @@ export function FeatureCard({
 }) {
   return (
     <Panel className="p-6">
-      <div className="mb-4 grid size-9 place-items-center rounded-lg bg-white/[0.06] text-foreground ring-1 ring-white/10 ring-inset">
+      <div className="mb-4 grid size-9 place-items-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/20 ring-inset">
         {icon}
       </div>
       <h3 className="font-medium tracking-tight">{title}</h3>
