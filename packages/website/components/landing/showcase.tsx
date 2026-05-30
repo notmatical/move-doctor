@@ -9,19 +9,19 @@ const FEATURES = [
     icon: <BookText className="size-4" />,
     title: "Every rule cited",
     description:
-      "Every rule links to its exact section of The Move Book or the relevant concept page. No vibes.",
+      "Each finding links to the exact Move Book section or concept page behind it, so you can check the reasoning instead of trusting a black box.",
   },
   {
     icon: <Terminal className="size-4" />,
     title: "Built for coding agents",
     description:
-      "One command drops a SKILL.md into your agents so they fetch the fix recipe and patch the code themselves.",
+      "move-doctor install drops a SKILL.md into Claude Code, Cursor, and more. Your agent fetches each rule's fix recipe and applies it for you.",
   },
   {
     icon: <Zap className="size-4" />,
     title: "Folds in sui --lint",
     description:
-      "When the Sui CLI is on PATH, its compiler lints run alongside and feed the same score.",
+      "With the Sui CLI on PATH, the compiler's own lints run in the same pass and fold into one score, so you read a single report.",
   },
 ];
 
