@@ -1,5 +1,5 @@
 name: "Move Doctor"
-description: "A deterministic linter for Sui Move. Catches the convention, idiom, ability, and security mistakes the compiler misses — scored 0-100, every rule cited."
+description: "A deterministic linter for Sui Move. Catches mistakes the compiler misses — scored 0-100, every rule cited."
 branding:
   icon: "crosshair"
   color: "blue"
