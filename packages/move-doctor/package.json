@@ -1,6 +1,6 @@
 {
   "name": "move-doctor",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A deterministic linter for Sui Move. Rules cited via the Move Book, with a SKILL.md for coding agents.",
   "keywords": [
     "sui",

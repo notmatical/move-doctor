@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0
+
+### Minor Changes
+
+- [`b750e20`](https://github.com/notmatical/move-doctor/commit/b750e206ac81077dd751e1b71096becad88b9750) Thanks [@notmatical](https://github.com/notmatical)! - Citations now link to their exact source. Every rule carries a `citationUrl` pointing at the precise Move Book code-quality-checklist anchor (e.g. `#capabilities-go-second`) or concept page, and citation labels use descriptive headings ("Move Book: Capabilities Go Second") instead of opaque section numbers. The URL flows through to `--json` diagnostics, the website rule pages, and the generated rule playbooks.
+
+### Patch Changes
+
+- [#1](https://github.com/notmatical/move-doctor/pull/1) [`e133e5e`](https://github.com/notmatical/move-doctor/commit/e133e5e12856a77cbafaf71575c5f0f981f5ad44) Thanks [@notmatical](https://github.com/notmatical)! - Refresh package branding: new tagline "A deterministic linter for Sui Move", a clearer npm `description`, tidied `keywords` (dropped the inaccurate `audit` tag), and a README with up-to-date sample output and source-linked rule buckets.
+
 All notable changes to the `move-doctor` package will be documented here. This project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
