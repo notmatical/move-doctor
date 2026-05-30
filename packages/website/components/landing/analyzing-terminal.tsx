@@ -32,6 +32,16 @@ const LINES: Line[] = [
   { k: "score", value: "87 / 100", detail: "1 error · 1 warning" },
 ];
 
+function lineKey(line: Line): string {
+  if (line.k === "cmd") {
+    return "cmd";
+  }
+  if (line.k === "find") {
+    return line.rule;
+  }
+  return "score";
+}
+
 export function AnalyzingTerminal() {
   return (
     <div className="overflow-hidden rounded-xl border border-border/60 bg-black/40 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)]">
@@ -46,8 +56,8 @@ export function AnalyzingTerminal() {
       </header>
 
       <div className="px-4 py-4 font-mono text-xs leading-[1.95]">
-        {LINES.map((line, i) => (
-          <div className="flex items-center gap-2" key={i}>
+        {LINES.map((line) => (
+          <div className="flex items-center gap-2" key={lineKey(line)}>
             <Content line={line} />
           </div>
         ))}
