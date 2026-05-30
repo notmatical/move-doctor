@@ -1,8 +1,5 @@
 import type { NextConfig } from "next";
 
-const config: NextConfig = {
-  transpilePackages: ["rules", "core"],
-  typedRoutes: true,
-};
+const nextConfig: NextConfig = {};
 
-export default config;
+export default nextConfig;
