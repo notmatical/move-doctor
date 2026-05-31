@@ -10,27 +10,7 @@ Deterministic Sui Move scanner. Rules grounded in [The Move Book](https://move-b
 npx move-doctor@latest
 ```
 
-Scans the current directory and prints a health score, a per-bucket breakdown, and next steps. Add `--verbose` for file/line refs and fix hints. Sample output:
-
-```
-  ╭────────────────────────────────────────────────────────────────────────╮
-  │                                                                        │
-  │ 44 / 100   poor                                          movebook_gaps │
-  │ ███████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-  │                                                                        │
-  │ 2 modules · edition 2024.beta · Sui 1.70.2 · scanned in 1.3s           │
-  │ 22 findings  >  4 errors · 3 warnings · 15 info                        │
-  ╰────────────────────────────────────────────────────────── move.doctor ─╯
-
-  security     >  4 errors · 3 warnings
-  conventions  >  5 info
-  testing      >  5 info
-  functions    >  2 info
-  idioms       >  2 info
-  macros       >  1 info
-
-  > Run --verbose for file refs and fix hints.
-```
+Scans the current directory and prints a 0–100 health score, a severity breakdown by area, and next steps. Add `--verbose` for file/line refs and fix hints. With the Sui CLI on `PATH`, its `sui move build --lint` pass runs alongside and feeds the same score.
 
 ## Install as an agent skill
 
@@ -40,19 +20,14 @@ npx move-doctor@latest install
 
 Writes `<cwd>/.claude/skills/move-doctor/SKILL.md`. Claude Code picks it up automatically — type `/movedoctor` or ask it to "run move doctor" and it'll scan, group findings, and fix them.
 
-## CI gate
+## CI
 
-Use `--score` for a numeric output and gate PRs on a budget:
+`npx move-doctor@latest install` can set up a GitHub Actions workflow that scores every push and pull request. To gate by hand, fail the build below a score budget:
 
 ```bash
 SCORE=$(npx move-doctor@latest . --score)
 [ "$SCORE" -ge 80 ] || exit 1
 ```
-
-## Requirements
-
-- Node.js ≥ 20
-- (Optional) Sui CLI on PATH — when present, `sui move build --lint` runs in parallel and its 6 built-in lints feed the same score.
 
 ## Source
 
