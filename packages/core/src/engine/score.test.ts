@@ -46,4 +46,23 @@ describe("computeScore", () => {
     const result = computeScore(manyErrors);
     expect(result.score).toBe(0);
   });
+
+  it("caps a noisy info rule at 5 (info is down-weighted)", () => {
+    const manyInfoOneRule = Array.from({ length: 50 }, () =>
+      fakeDiagnostic({ ruleId: "noisy/info", severity: "info" })
+    );
+    const result = computeScore(manyInfoOneRule);
+    expect(result.score).toBe(100 - 5);
+  });
+
+  it("does not let info-only findings tank the score", () => {
+    const infoHeavy = Array.from({ length: 120 }, (_, index) =>
+      fakeDiagnostic({ ruleId: `info/rule-${index % 6}`, severity: "info" })
+    );
+    const result = computeScore(infoHeavy);
+
+    // 6 rules × 5 cap = 30 deductions → 70.
+    expect(result.score).toBe(70);
+    expect(result.bySeverity.error).toBe(0);
+  });
 });
