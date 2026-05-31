@@ -1,29 +1,33 @@
 import type {
-  Diagnostic,
   PackageScanResult,
-  Severity,
   WorkspaceInfo,
   WorkspaceInspectResult,
 } from "core";
-import { colorizeByScore, highlighter, PERFECT_SCORE, scoreLabel } from "core";
-import { buildInfoCard } from "./render.js";
+import { colorizeByScore, highlighter, PERFECT_SCORE } from "core";
+import { BAR_WIDTH } from "./constants.js";
+import {
+  barRow,
+  buildBucketRuleDetail,
+  buildDiagnosisHeader,
+  severityDot,
+  severitySummary,
+} from "./render-common.js";
+import { CMD } from "./utils/commands.js";
+import { glyph } from "./utils/glyphs.js";
+import { magnitudeBar, type SeverityCounts } from "./utils/meter.js";
 
-const POINTER =
-  process.platform === "win32" && !process.env.WT_SESSION ? ">" : "·";
+// Right-aligned to fit "100/100" so the score column lines up across rows.
+const SCORE_COL = `${PERFECT_SCORE}/${PERFECT_SCORE}`.length;
 
-const buildBar = (score: number, width: number): string => {
-  const filled = Math.round((score / PERFECT_SCORE) * width);
-  const empty = width - filled;
-  return (
-    colorizeByScore("█".repeat(filled), score) +
-    highlighter.muted("░".repeat(empty))
-  );
-};
+const countsOf = (entry: PackageScanResult): SeverityCounts => ({
+  errors: entry.score.bySeverity.error,
+  warnings: entry.score.bySeverity.warning,
+  info: entry.score.bySeverity.info,
+});
 
-// The workspace score header reuses the shared info card from render.ts, passing
-// the aggregate (worst-wins) score, the summed module count, and the package
-// count so the card shows "N packages · M modules · …".
-const buildWorkspaceScoreHeader = (
+// The workspace header reuses the shared diagnosis header, passing the aggregate
+// (worst-package-wins) score, summed module count, and package count.
+const buildWorkspaceHeader = (
   workspace: WorkspaceInfo,
   result: WorkspaceInspectResult,
   suiVersion: string | null,
@@ -35,7 +39,7 @@ const buildWorkspaceScoreHeader = (
     (sum, entry) => sum + (entry.skipped ? 0 : entry.moduleCount),
     0
   );
-  return buildInfoCard({
+  return buildDiagnosisHeader({
     score: result.aggregateScore.score,
     title: workspaceName,
     suiVersion,
@@ -67,75 +71,55 @@ const formatPackageName = (relativePath: string, width: number): string => {
   return `${highlighter.muted(prefix)}${leaf}${pad}`;
 };
 
-const buildPerPackageTable = (
+// "by package" — one magnitude+composition bar per package (length = its share
+// of the busiest package's finding count, colour = its severity mix) alongside
+// the package score. Worst score first, so problem packages surface at the top.
+const buildPackageBreakdown = (
   perPackage: readonly PackageScanResult[]
-): string => {
-  const lines: string[] = [];
-  lines.push("");
-  lines.push(`  ${highlighter.bold("Per-package scores")}`);
-
-  const nameColWidth = Math.max(
+): string[] => {
+  const labelWidth = Math.max(
     ...perPackage.map((entry) => entry.relativePath.length),
-    "Package".length
+    "package".length
   );
-  const barWidth = 18;
-
+  const maxTotal = Math.max(
+    ...perPackage
+      .filter((entry) => !entry.skipped)
+      .map((entry) => entry.diagnostics.length),
+    1
+  );
   const sorted = [...perPackage].sort((a, b) => a.score.score - b.score.score);
+
+  const lines: string[] = [
+    "",
+    `  ${highlighter.bold("by package")}  ${highlighter.muted(`(score out of ${PERFECT_SCORE})`)}`,
+  ];
   for (const entry of sorted) {
-    const name = formatPackageName(entry.relativePath, nameColWidth);
+    const name = formatPackageName(entry.relativePath, labelWidth);
     if (entry.skipped) {
       lines.push(
-        `  ${highlighter.muted(entry.relativePath.padEnd(nameColWidth))}  ${highlighter.muted("—")} ${highlighter.muted("·")} ${highlighter.muted("no changed files")}`
+        barRow(
+          highlighter.muted(glyph.dotOpen),
+          name,
+          " ".repeat(BAR_WIDTH),
+          highlighter.muted("—".padStart(SCORE_COL)),
+          highlighter.muted("skipped · no changed files")
+        )
       );
       continue;
     }
-    const score = entry.score.score;
-    const scoreText = colorizeByScore(String(score).padStart(3), score);
-    const bar = buildBar(score, barWidth);
-    const label = colorizeByScore(scoreLabel(score), score);
-    const errors = entry.score.bySeverity.error;
-    const warnings = entry.score.bySeverity.warning;
-    const infos = entry.score.bySeverity.info;
-    const findings: string[] = [];
-    if (errors > 0) {
-      findings.push(highlighter.error(`${errors}e`));
-    }
-    if (warnings > 0) {
-      findings.push(highlighter.warn(`${warnings}w`));
-    }
-    if (infos > 0) {
-      findings.push(highlighter.muted(`${infos}i`));
-    }
-    const findingsCol =
-      findings.length > 0 ? findings.join(" ") : highlighter.muted("clean");
-
-    // Regular weight (not bold) so the package rows read as data under the bold
-    // "Per-package scores" heading, rather than competing with it.
-    lines.push(
-      `  ${name}  ${scoreText}  ${bar}  ${label.padEnd(10)}  ${findingsCol}`
+    const counts = countsOf(entry);
+    const bar = magnitudeBar(counts, BAR_WIDTH, maxTotal);
+    const score = colorizeByScore(
+      `${entry.score.score}/${PERFECT_SCORE}`.padStart(SCORE_COL),
+      entry.score.score
     );
+    const trailing =
+      entry.diagnostics.length === 0
+        ? highlighter.ok("clean")
+        : severitySummary(counts);
+    lines.push(barRow(severityDot(counts), name, bar, score, trailing));
   }
-  return lines.join("\n");
-};
-
-const severityIcon = (severity: Severity): string => {
-  if (severity === "error") {
-    return "✗";
-  }
-  if (severity === "warning") {
-    return "⚠";
-  }
-  return "·";
-};
-
-const colorizeBySeverity = (text: string, severity: Severity): string => {
-  if (severity === "error") {
-    return highlighter.error(text);
-  }
-  if (severity === "warning") {
-    return highlighter.warn(text);
-  }
-  return highlighter.muted(text);
+  return lines;
 };
 
 interface WorkspaceRenderOptions {
@@ -148,100 +132,63 @@ interface WorkspaceRenderOptions {
   workspace: WorkspaceInfo;
 }
 
-const buildWorkspaceNextSteps = (options: WorkspaceRenderOptions): string => {
+const buildWorkspaceNextSteps = (options: WorkspaceRenderOptions): string[] => {
   const lines: string[] = [];
   if (!options.verbose) {
     lines.push(
-      `  ${highlighter.muted(POINTER)} For details: ${highlighter.accent("npx move-doctor@latest --verbose")}`
+      `  ${highlighter.muted(glyph.pointer)} For per-finding detail: ${highlighter.accent(CMD.verbose)}`
     );
   }
   if (!options.hasInstalledSkill) {
     lines.push(
-      `  ${highlighter.muted(POINTER)} Install the agent skill: ${highlighter.accent("npx move-doctor install")}`
+      `  ${highlighter.muted(glyph.pointer)} Install the agent skill: ${highlighter.accent(CMD.install)}`
     );
   }
   if (!options.hasSuiCli) {
     lines.push(
-      `  ${highlighter.muted(POINTER)} Install the Sui CLI to enable compiler lints (W0*).`
+      `  ${highlighter.muted(glyph.pointer)} Install the Sui CLI to enable compiler lints (W0*).`
     );
   }
-  lines.push(
-    `  ${highlighter.muted(POINTER)} Full rule catalog: ${highlighter.accent("https://move.doctor/docs/rules")}`
-  );
-  return lines.length > 0 ? `\n${lines.join("\n")}` : "";
+  return lines.length > 0 ? ["", ...lines] : [];
 };
 
-const buildVerboseDetails = (
+// Verbose: per-package findings, grouped by bucket then rule.
+const buildWorkspaceDetail = (
   perPackage: readonly PackageScanResult[]
-): string => {
-  const sections: string[] = [];
+): string[] => {
+  const lines: string[] = ["", `  ${highlighter.bold("findings")}`];
   for (const entry of perPackage) {
     if (entry.diagnostics.length === 0) {
       continue;
     }
-    sections.push("");
-    sections.push(
-      `  ${highlighter.bold(entry.relativePath)} ${highlighter.muted(`(${entry.diagnostics.length} finding${entry.diagnostics.length === 1 ? "" : "s"})`)}`
+    const count = entry.diagnostics.length;
+    lines.push("");
+    lines.push(
+      `  ${severityDot(countsOf(entry))} ${highlighter.bold(entry.relativePath)} ${highlighter.muted(`(${count} finding${count === 1 ? "" : "s"})`)}`
     );
-    const ruleColWidth = Math.max(
-      ...entry.diagnostics.map((d) => d.ruleId.length),
-      0
+    lines.push(
+      ...buildBucketRuleDetail(entry.diagnostics, entry.project.rootDirectory)
     );
-    const byRule = new Map<string, Diagnostic[]>();
-    for (const diagnostic of entry.diagnostics) {
-      const list = byRule.get(diagnostic.ruleId) ?? [];
-      list.push(diagnostic);
-      byRule.set(diagnostic.ruleId, list);
-    }
-    for (const [ruleId, diagnostics] of byRule) {
-      const first = diagnostics[0]!;
-      const icon = colorizeBySeverity(
-        severityIcon(first.severity),
-        first.severity
-      );
-      const ruleText = colorizeBySeverity(
-        ruleId.padEnd(ruleColWidth),
-        first.severity
-      );
-      const count =
-        diagnostics.length > 1
-          ? `  ${highlighter.muted(`×${diagnostics.length}`)}`
-          : "";
-      sections.push(`  ${icon} ${ruleText}${count}`);
-      sections.push(highlighter.muted(`      ${first.message}`));
-      if (first.fixHint) {
-        sections.push(highlighter.muted(`      ${POINTER} ${first.fixHint}`));
-      }
-      for (const diagnostic of diagnostics) {
-        const rel = `${entry.relativePath}/${diagnostic.filePath.split(/[\\/]/).at(-1)}`;
-        sections.push(
-          highlighter.muted(
-            `      ${rel}:${diagnostic.line}:${diagnostic.column}`
-          )
-        );
-      }
-    }
   }
-  return sections.join("\n");
+  return lines;
 };
 
 export const renderWorkspaceText = (
   options: WorkspaceRenderOptions
 ): string => {
-  const sections: string[] = [];
-  sections.push(
-    buildWorkspaceScoreHeader(
+  const sections: string[] = [
+    buildWorkspaceHeader(
       options.workspace,
       options.result,
       options.suiVersion,
       options.durationMs ?? null
-    )
-  );
-  sections.push(buildPerPackageTable(options.result.perPackage));
-  if (options.verbose) {
-    sections.push(buildVerboseDetails(options.result.perPackage));
+    ),
+    ...buildPackageBreakdown(options.result.perPackage),
+  ];
+  if (options.verbose && options.result.diagnostics.length > 0) {
+    sections.push(...buildWorkspaceDetail(options.result.perPackage));
   }
-  sections.push(buildWorkspaceNextSteps(options));
+  sections.push(...buildWorkspaceNextSteps(options));
   return sections.join("\n");
 };
 

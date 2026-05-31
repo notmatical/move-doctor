@@ -18,7 +18,6 @@ import {
 } from "core";
 import { astRules, fileRules, manifestRules } from "rules";
 import { DiffResolutionError, resolveChangedFiles } from "./diff.js";
-import { installSkill } from "./install.js";
 import { type ParsedArgs, parseArgs } from "./parse-args.js";
 import { renderJson, renderScoreOnly, renderText } from "./render.js";
 import {
@@ -28,10 +27,12 @@ import {
 } from "./render-workspace.js";
 import { printBrandedHeader, VERSION } from "./utils/branded-header.js";
 import { detectContext, detectSuiVersion } from "./utils/detect-context.js";
+import { glyph } from "./utils/glyphs.js";
 import { runInstallWizard } from "./utils/install-wizard.js";
 import { isInteractive } from "./utils/is-ci.js";
+import { errorExitCode, writeError } from "./utils/output.js";
 import { hasDisabledSetupPrompt } from "./utils/persistent-config.js";
-import { resolveScope } from "./utils/scope-prompt.js";
+import { promptPackageScope, resolveScope } from "./utils/scope-prompt.js";
 import { startSpinner } from "./utils/spinner.js";
 
 const HELP_TEXT = `Move Doctor — A deterministic linter for Sui Move.
@@ -60,8 +61,27 @@ Setup flags:
   -v, --version         Show version
 `;
 
-const writeError = (message: string): void => {
-  process.stderr.write(`${highlighter.error("✗")} ${message}\n`);
+// After a scan, offer the interactive setup wizard unless it was suppressed,
+// the project is already fully set up, or setup was previously declined.
+const offerSetupIfNeeded = async (
+  workspace: WorkspaceInfo,
+  args: ParsedArgs,
+  skillInstalled: boolean
+): Promise<void> => {
+  const fullySetUp =
+    skillInstalled && isWorkflowInstalledForWorkspace(workspace);
+  const shouldOffer =
+    !args.skipSetup &&
+    isInteractive() &&
+    !fullySetUp &&
+    !(await hasDisabledSetupPrompt(workspace.rootDirectory));
+  if (shouldOffer) {
+    await runInstallWizard({
+      projectRoot: workspace.rootDirectory,
+      yes: false,
+    });
+    process.stdout.write("\n");
+  }
 };
 
 interface ResolvedScanPlan {
@@ -181,7 +201,6 @@ const runSinglePackageScan = async (
   }
   scanSpinner?.stop();
   const durationMs = Date.now() - scanStartedAt;
-  const scannedFileCount = changedFiles ? changedFiles.length : totalFileCount;
 
   if (
     result.diagnostics.length === 0 &&
@@ -190,24 +209,23 @@ const runSinglePackageScan = async (
     !args.scoreOnly
   ) {
     process.stderr.write(
-      `  ${highlighter.warn("⚠")} ${highlighter.warn("warning")} ${highlighter.muted("— no .move source files found; score does not reflect a real codebase.")}\n`
+      `  ${highlighter.warn(glyph.warn)} ${highlighter.warn("warning")} ${highlighter.muted("— no .move source files found; score does not reflect a real codebase.")}\n`
     );
   }
 
   if (args.json) {
     process.stdout.write(`${renderJson(result)}\n`);
-    return result.score.bySeverity.error > 0 ? 1 : 0;
+    return errorExitCode(result.score);
   }
   if (args.scoreOnly) {
     process.stdout.write(`${renderScoreOnly(result)}\n`);
-    return result.score.bySeverity.error > 0 ? 1 : 0;
+    return errorExitCode(result.score);
   }
 
   const skillInstalled = isSkillInstalledForWorkspace(workspace);
   process.stdout.write(
     `\n${renderText(result, {
       verbose: args.verbose,
-      scannedFileCount,
       hasInstalledSkill: skillInstalled,
       hasSuiCli: suiVersion !== null,
       suiVersion,
@@ -215,22 +233,8 @@ const runSinglePackageScan = async (
     })}\n\n`
   );
 
-  const workflowInstalled = isWorkflowInstalledForWorkspace(workspace);
-  const shouldOfferSetup =
-    !args.skipSetup &&
-    isInteractive() &&
-    !(skillInstalled && workflowInstalled) &&
-    !(await hasDisabledSetupPrompt(workspace.rootDirectory));
-
-  if (shouldOfferSetup) {
-    await runInstallWizard({
-      projectRoot: workspace.rootDirectory,
-      yes: false,
-    });
-    process.stdout.write("\n");
-  }
-
-  return result.score.bySeverity.error > 0 ? 1 : 0;
+  await offerSetupIfNeeded(workspace, args, skillInstalled);
+  return errorExitCode(result.score);
 };
 
 const runWorkspaceScan = async (
@@ -290,11 +294,11 @@ const runWorkspaceScan = async (
 
   if (args.json) {
     process.stdout.write(`${renderWorkspaceJson(workspace, result)}\n`);
-    return result.aggregateScore.bySeverity.error > 0 ? 1 : 0;
+    return errorExitCode(result.aggregateScore);
   }
   if (args.scoreOnly) {
     process.stdout.write(`${renderWorkspaceScoreOnly(result)}\n`);
-    return result.aggregateScore.bySeverity.error > 0 ? 1 : 0;
+    return errorExitCode(result.aggregateScore);
   }
 
   const skillInstalled = isSkillInstalledForWorkspace(workspace);
@@ -310,23 +314,8 @@ const runWorkspaceScan = async (
     })}\n\n`
   );
 
-  const workflowInstalled = isWorkflowInstalledForWorkspace(workspace);
-  const shouldOfferSetup =
-    !args.skipSetup &&
-    isInteractive() &&
-    !(skillInstalled && workflowInstalled) &&
-    !(await hasDisabledSetupPrompt(workspace.rootDirectory));
-
-  if (shouldOfferSetup) {
-    await runInstallWizard({
-      projectRoot: workspace.rootDirectory,
-      yes: false,
-      rootDisplayName: path.basename(workspace.rootDirectory),
-    });
-    process.stdout.write("\n");
-  }
-
-  return result.aggregateScore.bySeverity.error > 0 ? 1 : 0;
+  await offerSetupIfNeeded(workspace, args, skillInstalled);
+  return errorExitCode(result.aggregateScore);
 };
 
 export const runCli = async (argv: readonly string[]): Promise<number> => {
@@ -367,7 +356,6 @@ export const runCli = async (argv: readonly string[]): Promise<number> => {
     } catch {
       // skip silently. install can run in a move-less repo (rare but supported)
     }
-    void installSkill;
     await runInstallWizard({ projectRoot, yes: args.yes || !isInteractive() });
     process.stdout.write("\n");
     return 0;
@@ -418,25 +406,31 @@ export const runCli = async (argv: readonly string[]): Promise<number> => {
     return 2;
   }
 
-  // render the detection-success line. if we're in focus mode (cwd inside one
-  // package), surface that. Otherwise show workspace-level info.
-  const workspaceSui = await detectSuiVersion(workspace.rootDirectory);
-  const suiLabel = workspaceSui
-    ? highlighter.muted(` · Sui ${workspaceSui.split("-")[0]}`)
-    : "";
-  if (plan.focusPackage && workspace.isMonorepo) {
-    const focused = plan.focusPackage;
-    contextSpinner?.succeed(
-      `${highlighter.bold(focused.packageName)} ${highlighter.muted(`(1 of ${workspace.packages.length})`)} ${highlighter.muted(`edition ${focused.edition ?? "unset"}`)}${suiLabel}`
+  // Detection is done; the diagnosis header below owns the identity (name,
+  // packages, Sui), so we just clear the spinner instead of printing a success
+  // line that would duplicate it. In a monorepo, when cwd is inside one package,
+  // offer an interactive choice to scan just it or the whole workspace
+  // (non-interactive runs stay focused and surface an --all hint).
+  contextSpinner?.stop();
+
+  const canPromptScope = !(args.json || args.scoreOnly) && isInteractive();
+  if (plan.focusPackage && workspace.isMonorepo && canPromptScope) {
+    const scope = await promptPackageScope(
+      plan.focusPackage.packageName,
+      workspace.packages.length
     );
-  } else if (workspace.isMonorepo) {
-    contextSpinner?.succeed(
-      `${highlighter.bold(path.basename(workspace.rootDirectory))} ${highlighter.muted(`· ${workspace.packages.length} packages`)}${suiLabel}`
-    );
-  } else {
-    const only = workspace.packages[0]!;
-    contextSpinner?.succeed(
-      `${highlighter.bold(only.packageName)} ${highlighter.muted(`edition ${only.edition ?? "unset"}`)}${suiLabel}`
+    if (scope === "all") {
+      plan = {
+        workspace,
+        packagesToScan: workspace.packages,
+        focusPackage: null,
+      };
+    }
+  } else if (plan.focusPackage && workspace.isMonorepo && showHeader) {
+    process.stderr.write(
+      highlighter.muted(
+        `  ${glyph.pointer} Scanning only ${plan.focusPackage.packageName} — use --all for the whole workspace.\n`
+      )
     );
   }
 
