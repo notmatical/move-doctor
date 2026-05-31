@@ -38,7 +38,7 @@ Fail the build below a budget (`score < 80`), or let `move-doctor install` drop 
 
 ## Contributing
 
-Issues and new rules welcome — the only bar is that every rule cites a canonical source. Most rules are AST-based (tree-sitter); layout, comment, and `Move.toml` checks stay regex, and adding one is a single file. See [`CONTRIBUTING.md`](./CONTRIBUTING.md), the [rule-writing guide](./docs/authoring-rules.md), and the [full rule list](https://move.doctor/docs/rules).
+Issues and new rules welcome — the only bar is that every rule cites a canonical source. Most rules are AST-based (tree-sitter); layout, comment, and `Move.toml` checks stay regex, and adding one is a single file. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) and the [rule-writing guide](./docs/authoring-rules.md).
 
 ## License
 

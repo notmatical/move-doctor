@@ -30,7 +30,6 @@ Scans the current directory and prints a health score, a per-bucket breakdown, a
   macros       >  1 info
 
   > Run --verbose for file refs and fix hints.
-  > Full rule catalog: https://move.doctor/docs/rules
 ```
 
 ## Install as an agent skill
@@ -59,7 +58,6 @@ SCORE=$(npx move-doctor@latest . --score)
 
 - Source code: [github.com/notmatical/move-doctor](https://github.com/notmatical/move-doctor)
 - Issues: [github.com/notmatical/move-doctor/issues](https://github.com/notmatical/move-doctor/issues)
-- Per-rule playbooks: [move.doctor/docs/rules](https://move.doctor/docs/rules)
 - Agent prompt: [move.doctor/prompts/move-doctor-agent.md](https://move.doctor/prompts/move-doctor-agent.md)
 
 ## License
