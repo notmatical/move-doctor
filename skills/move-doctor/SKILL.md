@@ -26,14 +26,9 @@ curl --fail --silent --show-error \
   https://move.doctor/prompts/move-doctor-agent.md
 ```
 
-It's a scan → group → triage → fix → re-score loop that edits the working tree directly (never commits, never opens PRs). For each finding, fetch the matching per-rule fix recipe on demand — `<bucket>/<rule>` comes straight from the diagnostic's rule id:
+It's a scan → triage → fix → re-score loop that edits the working tree directly (never commits, never opens PRs). Every finding in `--json` carries its own `fixHint` and `citation` — fix straight from those; there's nothing else to fetch.
 
-```bash
-curl --fail --silent --show-error \
-  https://move.doctor/prompts/rules/<bucket>/<rule>.md
-```
-
-If the fetch fails (offline / site down), fall back to: run `move-doctor --verbose`, fix errors first (`security/*` and `abilities/*` findings are real vulnerabilities, not style), apply each finding's `fixHint` verbatim, and re-run until the score stops rising. Never suppress a rule unless you can explain why the surrounding code is a documented exception.
+If the fetch fails (offline / site down), fall back to: run `move-doctor --verbose`, fix errors first (`security/*` and `abilities/*` findings are real vulnerabilities, not style), apply each finding's `fixHint`, and re-run until the score stops rising. Never silence a finding unless you can explain why the surrounding code is a documented exception.
 
 ## Command
 
