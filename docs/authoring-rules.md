@@ -266,7 +266,7 @@ expect(myRule.scan(f("use a::b::{Self, C};\n"))).toEqual([]);   // look-alike, c
 
 ## Documenting the rule
 
-Each rule has a playbook at `docs/rules/<bucket>/<rule-name>.md`. The website serves these two ways: as the rule's catalog page at `/docs/rules/<bucket>/<rule>`, and as a plain-markdown endpoint at `/prompts/rules/<bucket>/<rule>.md` that agents fetch when fixing a finding. Add one when you add a rule — the slug must match the rule's id, and the heading should state the severity, bucket, and cited source.
+A rule documents itself — there is no separate per-rule doc to write or keep in sync. Its `citation` / `citationUrl` name the canonical source, and every diagnostic carries a one-line `message` (what's wrong) and `fixHint` (how to fix it). Those ship in `--json` and drive both the CLI output and the agent fix loop, so keep the `message` specific and the `fixHint` actionable.
 
 ## End-to-end workflow
 
