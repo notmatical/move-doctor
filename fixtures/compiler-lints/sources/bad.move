@@ -1,4 +1,4 @@
-module lint_trigger::bad;
+module compiler_lints::bad;
 
 public struct Thing has key, store {
     id: UID,

@@ -1,6 +1,6 @@
 [package]
-name = "phase5_bad"
+name = "ledger"
 edition = "2024.beta"
 
 [addresses]
-phase5_bad = "0x0"
+ledger = "0x0"

@@ -1,0 +1,6 @@
+[package]
+name = "compiler_lints"
+edition = "2024.beta"
+
+[addresses]
+compiler_lints = "0x0"

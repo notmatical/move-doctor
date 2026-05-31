@@ -1,6 +1,6 @@
 [package]
-name = "lint_trigger"
+name = "app"
 edition = "2024.beta"
 
 [addresses]
-lint_trigger = "0x0"
+app = "0x0"

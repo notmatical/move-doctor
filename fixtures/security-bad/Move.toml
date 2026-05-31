@@ -1,0 +1,6 @@
+[package]
+name = "security_bad"
+edition = "2024.beta"
+
+[addresses]
+security_bad = "0x0"

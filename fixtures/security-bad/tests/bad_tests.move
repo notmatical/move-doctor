@@ -1,5 +1,5 @@
 #[test_only]
-module phase5_bad::bad_tests;
+module security_bad::bad_tests;
 
 #[test]
 #[expected_failure(abort_code = 0)]

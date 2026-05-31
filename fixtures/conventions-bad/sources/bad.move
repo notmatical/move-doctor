@@ -1,3 +1,7 @@
+// NOTE: this fixture intentionally does NOT compile. Its `Move.toml` omits
+// `edition` and declares fake framework deps, so `sui move build` can't resolve
+// it — that malformed manifest is exactly what conventions/missing-edition-2024
+// and conventions/explicit-framework-dep test.
 module conventions_bad::bad;
 
 /**

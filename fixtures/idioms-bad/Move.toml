@@ -1,6 +1,6 @@
 [package]
-name = "phase4_bad"
+name = "idioms_bad"
 edition = "2024.beta"
 
 [addresses]
-phase4_bad = "0x0"
+idioms_bad = "0x0"
