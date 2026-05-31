@@ -1,8 +1,7 @@
 import type { InspectResult, RuleBucket } from "core";
 import { highlighter } from "core";
-
-const POINTER =
-  process.platform === "win32" && !process.env.WT_SESSION ? ">" : "›";
+import { CMD, SUI_INSTALL_URL } from "./commands.js";
+import { glyph } from "./glyphs.js";
 
 export interface NextStepsContext {
   hasInstalledSkill: boolean;
@@ -54,14 +53,14 @@ export const buildNextSteps = (context: NextStepsContext): string[] => {
   if (result.diagnostics.length > 0) {
     steps.push(
       buildNextStep(
-        `${highlighter.muted(POINTER)} Run ${highlighter.accent("--verbose")} for file refs and fix hints.`
+        `${highlighter.muted(glyph.pointer)} Run ${highlighter.accent("--verbose")} for file refs and fix hints.`
       )
     );
     const hottest = findHottestBucket(result);
     if (hottest) {
       steps.push(
         buildNextStep(
-          `${highlighter.muted(POINTER)} Focus on ${highlighter.bold(hottest)} first: ${highlighter.accent("move-doctor . --verbose")}`
+          `${highlighter.muted(glyph.pointer)} Focus on ${highlighter.bold(hottest)} first: ${highlighter.accent(CMD.verboseHere)}`
         )
       );
     }
@@ -70,7 +69,7 @@ export const buildNextSteps = (context: NextStepsContext): string[] => {
   if (!hasInstalledSkill) {
     steps.push(
       buildNextStep(
-        `${highlighter.muted(POINTER)} Install the agent skill so your agent can auto-fix findings: ${highlighter.accent("npx move-doctor install")}`
+        `${highlighter.muted(glyph.pointer)} Install the agent skill so your agent can auto-fix findings: ${highlighter.accent(CMD.install)}`
       )
     );
   }
@@ -78,16 +77,10 @@ export const buildNextSteps = (context: NextStepsContext): string[] => {
   if (!hasSuiCli) {
     steps.push(
       buildNextStep(
-        `${highlighter.muted(POINTER)} Install the Sui CLI to enable compiler lints (W0*): ${highlighter.accent("https://docs.sui.io/guides/developer/getting-started/sui-install")}`
+        `${highlighter.muted(glyph.pointer)} Install the Sui CLI to enable compiler lints (W0*): ${highlighter.accent(SUI_INSTALL_URL)}`
       )
     );
   }
-
-  steps.push(
-    buildNextStep(
-      `${highlighter.muted(POINTER)} Full rule catalog: ${highlighter.accent("https://move.doctor/docs/rules")}`
-    )
-  );
 
   for (const step of steps) {
     lines.push(`  ${step.line}`);

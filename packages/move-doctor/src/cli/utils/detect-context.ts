@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import * as path from "node:path";
 
 export interface ProjectContext {
@@ -37,13 +37,21 @@ const runCommand = (
     }
   });
 
-export const detectSuiVersion = async (cwd: string): Promise<string | null> => {
-  const result = await runCommand("sui", ["--version"], cwd);
-  if (!result || result.exitCode !== 0) {
-    return null;
-  }
-  const match = result.stdout.match(/sui\s+(\S+)/);
-  return match?.[1] ?? null;
+// The installed sui CLI version is stable for the life of the process, so we
+// memoize it — the workspace and package render paths both detect it, and
+// re-spawning `sui --version` each time is pure overhead.
+let suiVersionPromise: Promise<string | null> | undefined;
+
+export const detectSuiVersion = (cwd: string): Promise<string | null> => {
+  suiVersionPromise ??= (async () => {
+    const result = await runCommand("sui", ["--version"], cwd);
+    if (!result || result.exitCode !== 0) {
+      return null;
+    }
+    const match = result.stdout.match(/sui\s+(\S+)/);
+    return match?.[1] ?? null;
+  })();
+  return suiVersionPromise;
 };
 
 const detectGitChanges = async (
@@ -90,7 +98,6 @@ const countSourceFiles = async (rootDirectory: string): Promise<number> => {
   if (!existsSync(sourcesDirectory)) {
     return 0;
   }
-  const { readdir } = await import("node:fs/promises");
   let count = 0;
   const queue: string[] = [sourcesDirectory];
   while (queue.length > 0) {
