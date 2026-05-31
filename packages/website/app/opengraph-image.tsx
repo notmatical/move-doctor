@@ -50,6 +50,7 @@ export default function Image() {
           }}
         >
           <svg fill="none" height="38" viewBox="0 0 32 32" width="38">
+            <title>Move Doctor</title>
             <circle cx="16" cy="16" r="8" stroke="white" strokeWidth="2.4" />
             <path
               d="M16 3.5V7"
@@ -152,6 +153,7 @@ export default function Image() {
             }}
           >
             <svg height="280" viewBox="0 0 280 280" width="280">
+              <title>Health score</title>
               <defs>
                 <linearGradient id="ring" x1="0" x2="1" y1="0" y2="1">
                   <stop offset="0%" stopColor="#298dff" />
@@ -247,6 +249,6 @@ export default function Image() {
         { name: "Geist", data: geistRegular, weight: 400, style: "normal" },
         { name: "Geist", data: geistSemibold, weight: 600, style: "normal" },
       ],
-    },
+    }
   );
 }
