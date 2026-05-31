@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import { intro, log, outro, spinner } from "@clack/prompts";
 import {
   detectInstalledSkillAgents,
   getSkillAgentConfig,
@@ -20,10 +21,7 @@ import {
   hasDisabledSetupPrompt,
 } from "./persistent-config.js";
 import { type MultiSelectChoice, multiselect, select } from "./prompts.js";
-import { startSpinner } from "./spinner.js";
 
-const POINTER =
-  process.platform === "win32" && !process.env.WT_SESSION ? ">" : "›";
 const SKILL_NAME = "move-doctor";
 const FALLBACK_AGENT: SkillAgentType = "claude-code";
 
@@ -64,8 +62,6 @@ export interface InstallWizardOptions {
    * as the Move package root.
    */
   projectRoot: string;
-  /** Optional human-readable display name shown in the wizard summary. */
-  rootDisplayName?: string;
   yes?: boolean;
 }
 
@@ -141,34 +137,32 @@ const installWorkflow = async (
   return { path: targetPath, existed };
 };
 
-const formatSkillSummary = (
+// Headline shown on the install spinner's stop line; extras (canonical source
+// path, per-agent failures) follow as muted/warn log entries.
+const skillSummaryHeadline = (summary: SkillInstallSummary): string => {
+  if (summary.installed.length === 0) {
+    return "No agents detected — skill not installed";
+  }
+  const agents = summary.installed.map((entry) => entry.agent).join(", ");
+  const count = `${summary.installed.length} agent${summary.installed.length === 1 ? "" : "s"}`;
+  return `Skill installed for ${highlighter.bold(count)}  ${highlighter.muted(`(${agents})`)}`;
+};
+
+const emitSkillExtras = (
   summary: SkillInstallSummary,
   projectRoot: string
-): string => {
-  if (summary.installed.length === 0 && summary.failed.length === 0) {
-    return `  ${highlighter.muted("·")} No agents detected on this machine — skill not installed anywhere.`;
-  }
-  const lines: string[] = [];
-  if (summary.installed.length > 0) {
-    const agents = summary.installed.map((entry) => entry.agent).join(", ");
-    lines.push(
-      `  ${highlighter.ok("✓")} Skill installed for ${highlighter.bold(`${summary.installed.length} agent${summary.installed.length === 1 ? "" : "s"}`)}  ${highlighter.muted(`(${agents})`)}`
+): void => {
+  const canonical = summary.installed.find((entry) => entry.mode === "symlink");
+  if (canonical) {
+    log.message(
+      highlighter.muted(
+        `source: ${path.relative(projectRoot, canonical.path) || canonical.path}`
+      )
     );
-    const canonical = summary.installed.find(
-      (entry) => entry.mode === "symlink"
-    );
-    if (canonical) {
-      lines.push(
-        `       ${highlighter.muted(`source: ${path.relative(projectRoot, canonical.path) || canonical.path}`)}`
-      );
-    }
   }
   for (const failure of summary.failed) {
-    lines.push(
-      `  ${highlighter.warn("⚠")} ${failure.agent}: ${highlighter.muted(failure.error)}`
-    );
+    log.warn(`${failure.agent}: ${highlighter.muted(failure.error)}`);
   }
-  return lines.join("\n");
 };
 
 const detectAgentsWithFallback = async (): Promise<SkillAgentType[]> => {
@@ -215,15 +209,18 @@ const pickAgentsInteractively = async (
 // detect installed agents (with fallback) and, when `pick` is set, let the user
 // narrow the list. Surfaces the detected count + any narrowing.
 const resolveAgents = async (pick: boolean): Promise<SkillAgentType[]> => {
-  const detectionSpinner = startSpinner("Detecting installed agents…");
+  const detectionSpinner = spinner();
+  detectionSpinner.start("Detecting installed agents…");
   const detected = await detectAgentsWithFallback();
-  detectionSpinner.succeed(
+  detectionSpinner.stop(
     `Detected ${detected.length} agent${detected.length === 1 ? "" : "s"}: ${highlighter.muted(detected.join(", "))}`
   );
   const agents = pick ? await pickAgentsInteractively(detected) : detected;
   if (agents.length !== detected.length) {
-    process.stdout.write(
-      `  ${highlighter.muted("·")} Selected ${highlighter.bold(`${agents.length}`)} of ${detected.length}: ${highlighter.muted(agents.join(", "))}\n`
+    log.message(
+      highlighter.muted(
+        `Selected ${agents.length} of ${detected.length}: ${agents.join(", ")}`
+      )
     );
   }
   return agents;
@@ -234,50 +231,50 @@ const applyTargets = async (
   targets: ApplyTargets
 ): Promise<void> => {
   if (targets.skill) {
-    const installSpinner = startSpinner(
+    const installSpinner = spinner();
+    installSpinner.start(
       `Installing skill to ${targets.agents.length} agent${targets.agents.length === 1 ? "" : "s"}…`
     );
     const summary = await installSkillForAgents(projectRoot, targets.agents);
-    installSpinner.stop();
-    process.stdout.write(`${formatSkillSummary(summary, projectRoot)}\n`);
+    installSpinner.stop(skillSummaryHeadline(summary));
+    emitSkillExtras(summary, projectRoot);
   }
   if (targets.workflow) {
     const { path: workflowPath, existed } = await installWorkflow(projectRoot);
+    const rel = path.relative(projectRoot, workflowPath);
     if (existed) {
-      process.stdout.write(
-        `  ${highlighter.muted("·")} Workflow already exists at ${highlighter.muted(path.relative(projectRoot, workflowPath))}, left untouched.\n`
+      log.message(
+        highlighter.muted(`Workflow already exists at ${rel}, left untouched.`)
       );
     } else {
-      process.stdout.write(
-        `  ${highlighter.ok("✓")} GitHub workflow installed at ${highlighter.muted(path.relative(projectRoot, workflowPath))}\n`
-      );
+      log.success(`GitHub workflow installed at ${highlighter.muted(rel)}`);
     }
   }
   if (targets.agentHooks) {
-    const hookSpinner = startSpinner("Installing agent hooks…");
+    const hookSpinner = spinner();
+    hookSpinner.start("Installing agent hooks…");
     const result = installMoveDoctorAgentHooks({
       projectRoot,
       agents: targets.agents,
     });
-    hookSpinner.stop();
     if (result.installedAgents.length === 0) {
-      process.stdout.write(
-        `  ${highlighter.muted("·")} No Claude Code / Cursor agents selected — agent hooks not installed.\n`
+      hookSpinner.stop(
+        highlighter.muted(
+          "No Claude Code / Cursor agents — hooks not installed"
+        )
       );
     } else {
       const names = result.installedAgents
         .map((agent) => getSkillAgentConfig(agent).displayName)
         .join(", ");
-      process.stdout.write(
-        `  ${highlighter.ok("✓")} Agent hooks installed for ${highlighter.bold(names)}\n`
-      );
+      hookSpinner.stop(`Agent hooks installed for ${highlighter.bold(names)}`);
     }
   }
 };
 
 const printNoninteractiveHint = (projectRoot: string): void => {
   process.stdout.write(
-    `\n  ${highlighter.muted(POINTER)} Run ${highlighter.accent("npx move-doctor install --yes")} in ${highlighter.muted(projectRoot)} to install the skill + CI workflow.\n`
+    `\n  ${highlighter.muted("›")} Run ${highlighter.accent("npx move-doctor install --yes")} in ${highlighter.muted(projectRoot)} to install the skill + CI workflow.\n`
   );
 };
 
@@ -322,6 +319,7 @@ export const runInstallWizard = async (
 
   if (yes || !isInteractive()) {
     // non-interactive runs install the skill + workflow for every detected agent.
+    intro(`✚ ${highlighter.bold("move-doctor setup")}`);
     const agents = await resolveAgents(false);
     await applyTargets(projectRoot, {
       agents,
@@ -329,6 +327,7 @@ export const runInstallWizard = async (
       workflow: true,
       agentHooks: false,
     });
+    outro("Skill + CI workflow installed.");
     return;
   }
 
@@ -336,6 +335,8 @@ export const runInstallWizard = async (
     printNoninteractiveHint(projectRoot);
     return;
   }
+
+  intro(`✚ ${highlighter.bold("move-doctor setup")}`);
 
   // 1. build choices
   const choice = await select<SetupChoice>({
@@ -361,21 +362,23 @@ export const runInstallWizard = async (
   });
 
   if (choice === null || choice === "skip") {
+    outro(
+      `Skipped. Run ${highlighter.accent("npx move-doctor install")} anytime.`
+    );
     return;
   }
   if (choice === "never") {
     await disableSetupPrompt(projectRoot);
-    process.stdout.write(
-      `\n  ${highlighter.muted(POINTER)} Got it. Run ${highlighter.accent("npx move-doctor install")} when you change your mind.\n`
+    outro(
+      `Got it. Run ${highlighter.accent("npx move-doctor install")} when you change your mind.`
     );
     return;
   }
 
-  process.stdout.write("\n");
-
   // 2. which agents to install the skill for.
   const agents = await resolveAgents(true);
   if (agents.length === 0) {
+    outro("No agents selected — nothing installed.");
     return;
   }
 
@@ -400,7 +403,7 @@ export const runInstallWizard = async (
     workflow: !didSkipOptional && actions.includes("workflow"),
     agentHooks: !didSkipOptional && actions.includes("agent-hooks"),
   });
-  process.stdout.write(
-    `\n  ${highlighter.muted(POINTER)} Done. Run ${highlighter.accent("npx move-doctor .")} again to see the agent in action.\n`
+  outro(
+    `Done. Run ${highlighter.accent("npx move-doctor .")} again to see the agent in action.`
   );
 };

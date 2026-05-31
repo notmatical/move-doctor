@@ -1,4 +1,5 @@
 import { highlighter } from "core";
+import { glyph } from "./glyphs.js";
 import { isInteractive } from "./is-ci.js";
 
 const FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -19,9 +20,11 @@ export const startSpinner = (initialText: string): SpinnerHandle => {
     return {
       update: () => {},
       succeed: (text) =>
-        process.stderr.write(`  ${highlighter.ok("✓")} ${text}\n`),
+        process.stderr.write(`  ${highlighter.ok(glyph.check)} ${text}\n`),
       fail: (text) =>
-        process.stderr.write(`  ${highlighter.error("✗")} ${text}\n`),
+        process.stderr.write(
+          `  ${highlighter.error(glyph.crossMark)} ${text}\n`
+        ),
       stop: () => {},
     };
   }
@@ -57,8 +60,8 @@ export const startSpinner = (initialText: string): SpinnerHandle => {
     update: (text: string) => {
       currentText = text;
     },
-    succeed: (text: string) => finalize(highlighter.ok("✓"), text),
-    fail: (text: string) => finalize(highlighter.error("✗"), text),
+    succeed: (text: string) => finalize(highlighter.ok(glyph.check), text),
+    fail: (text: string) => finalize(highlighter.error(glyph.crossMark), text),
     stop: () => {
       if (finalized) {
         return;

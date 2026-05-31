@@ -1,9 +1,16 @@
-import { highlighter } from "core";
-import prompts from "prompts";
+import {
+  cancel,
+  multiselect as clackMultiselect,
+  select as clackSelect,
+  isCancel,
+} from "@clack/prompts";
 import { isInteractive } from "./is-ci.js";
 
-const POINTER =
-  process.platform === "win32" && !process.env.WT_SESSION ? ">" : "›";
+// Ctrl-C / Esc on any prompt aborts the whole run with the conventional 130.
+const abort = (): never => {
+  cancel("Cancelled.");
+  process.exit(130);
+};
 
 export interface SelectChoice<T extends string> {
   description?: string;
@@ -17,38 +24,33 @@ interface SelectOptions<T extends string> {
   message: string;
 }
 
-// Single-question select wrapper. Returns the chosen value, or `null` when:
-//   - the environment is not interactive (CI, coding-agent, piped stdin)
-//   - the user pressed Ctrl-C / Esc
-// Callers fallback to a sensible non-interactive default.
+// Single-question select. Returns the chosen value, or `null` when the
+// environment is not interactive (CI, coding-agent, piped stdin) so callers can
+// fall back to a sensible default. Cancellation exits the process.
 export const select = async <T extends string>(
   options: SelectOptions<T>
 ): Promise<T | null> => {
   if (!isInteractive()) {
     return null;
   }
-  const answer = await prompts(
-    {
-      type: "select",
-      name: "value",
-      message: options.message,
-      choices: options.choices.map((choice) => ({
-        title: choice.title,
-        description: choice.description,
-        value: choice.value,
-      })),
-      initial: options.initial ?? 0,
-    },
-    {
-      onCancel: () => {
-        process.stderr.write(
-          `\n  ${highlighter.muted(POINTER)} Cancelled.\n\n`
-        );
-        process.exit(130);
-      },
-    }
-  );
-  return (answer.value as T | undefined) ?? null;
+  const initialValue = options.choices[options.initial ?? 0]?.value;
+  // clack's `Option` type is a conditional that only resolves to the
+  // label-optional shape for a concrete primitive; calling it with `string`
+  // (T extends string) sidesteps the deferred-conditional error, then we cast
+  // the result back to the caller's narrower T.
+  const result = await clackSelect<string>({
+    message: options.message,
+    options: options.choices.map((choice) => ({
+      value: choice.value,
+      label: choice.title,
+      ...(choice.description ? { hint: choice.description } : {}),
+    })),
+    ...(initialValue === undefined ? {} : { initialValue }),
+  });
+  if (isCancel(result)) {
+    abort();
+  }
+  return result as T;
 };
 
 export interface MultiSelectChoice<T extends string> {
@@ -61,7 +63,6 @@ export interface MultiSelectChoice<T extends string> {
 
 interface MultiSelectOptions<T extends string> {
   choices: MultiSelectChoice<T>[];
-  hint?: string;
   message: string;
   min?: number;
 }
@@ -72,60 +73,22 @@ export const multiselect = async <T extends string>(
   if (!isInteractive()) {
     return null;
   }
-  const answer = await prompts(
-    {
-      type: "multiselect",
-      name: "values",
-      message: options.message,
-      hint: options.hint ?? "- Space to toggle. Enter to confirm.",
-      instructions: false,
-      min: options.min ?? 1,
-      choices: options.choices.map((choice) => ({
-        title: choice.title,
-        description: choice.description,
-        value: choice.value,
-        selected: choice.selected ?? false,
-        disabled: choice.disabled ?? false,
-      })),
-    },
-    {
-      onCancel: () => {
-        process.stderr.write(
-          `\n  ${highlighter.muted(POINTER)} Cancelled.\n\n`
-        );
-        process.exit(130);
-      },
-    }
-  );
-  return (answer.values as T[] | undefined) ?? null;
-};
-
-export interface ConfirmOptions {
-  initial?: boolean;
-  message: string;
-}
-
-export const confirm = async (
-  options: ConfirmOptions
-): Promise<boolean | null> => {
-  if (!isInteractive()) {
-    return null;
+  const initialValues = options.choices
+    .filter((choice) => choice.selected)
+    .map((choice) => choice.value);
+  const result = await clackMultiselect<string>({
+    message: options.message,
+    options: options.choices.map((choice) => ({
+      value: choice.value,
+      label: choice.title,
+      ...(choice.description ? { hint: choice.description } : {}),
+      disabled: choice.disabled ?? false,
+    })),
+    initialValues,
+    required: (options.min ?? 1) >= 1,
+  });
+  if (isCancel(result)) {
+    abort();
   }
-  const answer = await prompts(
-    {
-      type: "confirm",
-      name: "value",
-      message: options.message,
-      initial: options.initial ?? true,
-    },
-    {
-      onCancel: () => {
-        process.stderr.write(
-          `\n  ${highlighter.muted(POINTER)} Cancelled.\n\n`
-        );
-        process.exit(130);
-      },
-    }
-  );
-  return (answer.value as boolean | undefined) ?? null;
+  return result as T[];
 };

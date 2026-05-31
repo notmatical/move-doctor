@@ -46,15 +46,14 @@
     "clean": "rm -rf dist *.tsbuildinfo src/cli/skill-content.ts"
   },
   "dependencies": {
+    "@clack/prompts": "^1.4.0",
     "agent-install": "^0.0.5",
     "picocolors": "^1.1.1",
-    "prompts": "^2.4.2",
     "web-tree-sitter": "0.26.9"
   },
   "devDependencies": {
     "core": "workspace:*",
     "rules": "workspace:*",
-    "@types/prompts": "^2.4.9",
     "tsup": "^8.3.5"
   },
   "engines": {
